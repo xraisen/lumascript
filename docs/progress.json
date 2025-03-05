@@ -94,7 +94,7 @@
                 "Deployment tools",
                 "Plugin system"
             ],
-            "description": "Build entire data-driven applications in one language, similar to Gatsby Static HTML Website."
+            "description": "Build entire data-driven applications in one language, similar to Gatsby."
         },
         "matlab_replacement": {
             "status": "in_progress",
