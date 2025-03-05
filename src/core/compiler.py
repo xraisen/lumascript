@@ -1,3 +1,4 @@
+from ast import Import
 from typing import Dict, List, Optional
 from ..utils.logger import Logger
 from .parser import Node  # Import Node as base AST type
@@ -107,7 +108,7 @@ class WASMSections:
         """Generate WASM function section"""
         pass
 
-    def export_section(self, exports: List[Export]) -> bytes:
+    def export_section(self, exports: List[Import]) -> bytes:
         """Generate WASM export section"""
         pass
 

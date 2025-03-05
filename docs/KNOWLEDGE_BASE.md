@@ -45,7 +45,7 @@ LumaScript is a unified, safe, and fast programming language designed to revolut
      - Modern tooling
 
 2. **Gatsby Replacement**
-   - Build entire data-driven applications in one language
+   - Build entire data-driven applications in one language, similar to Gatsby Static HTML Website.
    - Modern web features with native performance
    - Static site generation with dynamic capabilities
    - Key advantages:

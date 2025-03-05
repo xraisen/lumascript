@@ -149,3 +149,5 @@ This knowledge base represents our commitment to:
 4. Focusing on performance and reliability
 
 Remember: "Make it work, make it right, make it fast, make it simple." 
+
+Glory to God!
