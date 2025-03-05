@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LumaScript Interactive Demos</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-900 text-white">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">LumaScript Interactive Demos</h1>
+        
+        <!-- Interactive Code Editor -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-gray-800 p-6 rounded-lg">
+                <h2 class="text-xl font-semibold mb-4">Code Editor</h2>
+                <textarea id="codeEditor" class="w-full h-64 bg-gray-700 text-white p-4 rounded"></textarea>
+                <button onclick="runCode()" class="mt-4 bg-green-500 px-4 py-2 rounded">Run Code</button>
+                <div id="output" class="mt-4 p-4 bg-gray-700 rounded"></div>
+            </div>
+
+            <!-- Live Preview -->
+            <div class="bg-gray-800 p-6 rounded-lg">
+                <h2 class="text-xl font-semibold mb-4">Live Preview</h2>
+                <div id="preview" class="w-full h-64 bg-gray-700 rounded"></div>
+            </div>
+        </div>
+
+        <!-- Demo Examples -->
+        <div class="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Basic Print Demo -->
+            <div class="bg-gray-800 p-6 rounded-lg">
+                <h3 class="text-lg font-semibold mb-2">Basic Print Demo</h3>
+                <pre class="bg-gray-700 p-4 rounded text-sm">
+func main() {
+    print("Hello from LumaScript!");
+}</pre>
+                <button onclick="loadDemo('print')" class="mt-2 bg-blue-500 px-4 py-2 rounded">Load</button>
+            </div>
+
+            <!-- Add Function Demo -->
+            <div class="bg-gray-800 p-6 rounded-lg">
+                <h3 class="text-lg font-semibold mb-2">Add Function Demo</h3>
+                <pre class="bg-gray-700 p-4 rounded text-sm">
+func add(a, b) {
+    return a + b;
+}
+func main() {
+    print(add(5, 3));
+}</pre>
+                <button onclick="loadDemo('add')" class="mt-2 bg-blue-500 px-4 py-2 rounded">Load</button>
+            </div>
+
+            <!-- Fibonacci Demo -->
+            <div class="bg-gray-800 p-6 rounded-lg">
+                <h3 class="text-lg font-semibold mb-2">Fibonacci Demo</h3>
+                <pre class="bg-gray-700 p-4 rounded text-sm">
+func fibonacci(n) {
+    if n <= 1 {
+        return n;
+    }
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+func main() {
+    print(fibonacci(10));
+}</pre>
+                <button onclick="loadDemo('fibonacci')" class="mt-2 bg-blue-500 px-4 py-2 rounded">Load</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Run code
+        async function runCode() {
+            const code = document.getElementById('codeEditor').value;
+            try {
+                const response = await fetch('/api/eval', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(code)
+                });
+                const data = await response.json();
+                document.getElementById('output').textContent = data.result;
+                updatePreview(code);
+            } catch (e) {
+                document.getElementById('output').textContent = `Error: ${e}`;
+            }
+        }
+
+        // Load demo
+        function loadDemo(type) {
+            let code = '';
+            switch(type) {
+                case 'print':
+                    code = `func main() {
+    print("Hello from LumaScript!");
+}`;
+                    break;
+                case 'add':
+                    code = `func add(a, b) {
+    return a + b;
+}
+func main() {
+    print(add(5, 3));
+}`;
+                    break;
+                case 'fibonacci':
+                    code = `func fibonacci(n) {
+    if n <= 1 {
+        return n;
+    }
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+func main() {
+    print(fibonacci(10));
+}`;
+                    break;
+            }
+            document.getElementById('codeEditor').value = code;
+            runCode();
+        }
+
+        // Update preview
+        function updatePreview(code) {
+            const preview = document.getElementById('preview');
+            if (code.includes('print')) {
+                preview.innerHTML = '<div class="p-4">Output will appear here</div>';
+            }
+        }
+    </script>
+</body>
+</html> 

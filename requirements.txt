@@ -1,0 +1,5 @@
+# Core dependencies
+wasmtime==14.0.0  # WASM runtime
+
+# Testing (optional)
+pytest==7.4.3     # Only needed for running tests 

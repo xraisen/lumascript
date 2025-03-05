@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# WASM
+*.wasm
+
+# Cache
+.wasm_cache/
+.pytest_cache/
+
+# Logs
+*.log
+
+# Build
+target/
+Cargo.lock
+
+# Temp files
+*.tmp
+*.temp
+.DS_Store
+
+# Project specific
+output/
+test_output/
+.qodo/
+
+# Logs
+*.log
+logs/ 

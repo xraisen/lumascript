@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LumaScript Hex Converter Test</title>
+</head>
+<body>
+    <h1>LumaScript Hex Converter Test</h1>
+    
+    <div>
+        <h3>Text to Hex</h3>
+        <input type="text" id="textInput" value="LumaScript">
+        <button onclick="convertToHex()">Convert to Hex</button>
+        <div id="hexOutput"></div>
+    </div>
+
+    <div>
+        <h3>Hex to Text</h3>
+        <input type="text" id="hexInput">
+        <button onclick="convertToText()">Convert to Text</button>
+        <div id="textOutput"></div>
+    </div>
+
+    <div>
+        <h3>Stats</h3>
+        <div id="stats"></div>
+    </div>
+
+    <script type="module">
+        import init, { LumaHexConverter } from './pkg/lumascript.js';
+
+        let converter;
+
+        async function initialize() {
+            await init();
+            converter = new LumaHexConverter();
+            updateStats();
+        }
+
+        window.convertToHex = function() {
+            const input = document.getElementById('textInput').value;
+            const hex = converter.text_to_hex(input);
+            document.getElementById('hexOutput').textContent = hex;
+            document.getElementById('hexInput').value = hex;
+            updateStats();
+        }
+
+        window.convertToText = function() {
+            const input = document.getElementById('hexInput').value;
+            try {
+                const text = converter.hex_to_text(input);
+                document.getElementById('textOutput').textContent = text;
+                updateStats();
+            } catch (e) {
+                document.getElementById('textOutput').textContent = 'Error: Invalid hex input';
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('stats').textContent = converter.get_stats();
+        }
+
+        initialize();
+    </script>
+</body>
+</html> 

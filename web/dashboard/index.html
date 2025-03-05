@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LumaScript Cache Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-900 text-white">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">LumaScript Cache Dashboard</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Cache Stats -->
+            <div class="bg-gray-800 p-6 rounded-lg">
+                <h2 class="text-xl font-semibold mb-4">Cache Statistics</h2>
+                <canvas id="cacheStatsChart"></canvas>
+            </div>
+
+            <!-- Recovery Stats -->
+            <div class="bg-gray-800 p-6 rounded-lg">
+                <h2 class="text-xl font-semibold mb-4">Recovery Statistics</h2>
+                <canvas id="recoveryStatsChart"></canvas>
+            </div>
+
+            <!-- Node Stats -->
+            <div class="bg-gray-800 p-6 rounded-lg">
+                <h2 class="text-xl font-semibold mb-4">Node Status</h2>
+                <canvas id="nodeStatsChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Real-time Monitoring -->
+        <div class="mt-8 bg-gray-800 p-6 rounded-lg">
+            <h2 class="text-xl font-semibold mb-4">Real-time Monitoring</h2>
+            <div id="realtimeStats" class="grid grid-cols-4 gap-4">
+                <div class="text-center">
+                    <div class="text-2xl font-bold" id="hitRatio">0%</div>
+                    <div class="text-sm">Hit Ratio</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold" id="latency">0ms</div>
+                    <div class="text-sm">Avg Latency</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold" id="memory">0MB</div>
+                    <div class="text-sm">Memory Usage</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold" id="nodes">0</div>
+                    <div class="text-sm">Active Nodes</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize charts and real-time updates
+        function initCharts() {
+            // Cache Stats Chart
+            new Chart(document.getElementById('cacheStatsChart'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Hit Ratio',
+                        data: [],
+                        borderColor: '#4CAF50'
+                    }]
+                }
+            });
+
+            // Recovery Stats Chart
+            new Chart(document.getElementById('recoveryStatsChart'), {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Recovery Attempts',
+                        data: [],
+                        backgroundColor: '#2196F3'
+                    }]
+                }
+            });
+
+            // Node Stats Chart
+            new Chart(document.getElementById('nodeStatsChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Active', 'Syncing', 'Recovering', 'Failed'],
+                    datasets: [{
+                        data: [0, 0, 0, 0],
+                        backgroundColor: ['#4CAF50', '#FFC107', '#2196F3', '#F44336']
+                    }]
+                }
+            });
+        }
+
+        // Update real-time stats
+        function updateStats() {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('hitRatio').textContent = 
+                        `${(data.hit_ratio * 100).toFixed(1)}%`;
+                    document.getElementById('latency').textContent = 
+                        `${data.operation_latency.toFixed(1)}ms`;
+                    document.getElementById('memory').textContent = 
+                        `${(data.memory_usage / 1024 / 1024).toFixed(1)}MB`;
+                });
+        }
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+            setInterval(updateStats, 1000);
+        });
+    </script>
+</body>
+</html> 

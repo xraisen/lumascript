@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LumaScript Playground</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #fff;
+        }
+        #editor {
+            width: 100%;
+            height: 200px;
+            background: #2d2d2d;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+        #output {
+            background: #2d2d2d;
+            padding: 10px;
+            min-height: 100px;
+            white-space: pre-wrap;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>LumaScript Playground</h1>
+    <textarea id="editor">func main() {
+    print("Hello from LumaScript!");
+}</textarea>
+    <button onclick="runCode()">Run</button>
+    <div id="output"></div>
+    <div id="stats" style="margin-top: 20px; padding: 10px; background: #2d2d2d;">
+        <h3>Cache Statistics</h3>
+        <pre id="cache-stats"></pre>
+    </div>
+    <div id="enhanced-stats" style="margin-top: 20px; padding: 10px; background: #2d2d2d;">
+        <h3>Enhanced Cache Statistics</h3>
+        <div id="cache-visualization"></div>
+        <pre id="enhanced-stats-content"></pre>
+    </div>
+    <script type="module">
+        import init, { LumaScript } from './pkg/lumascript.js';
+        
+        let lumascript;
+        
+        async function initWasm() {
+            await init();
+            lumascript = new LumaScript();
+        }
+        
+        initWasm();
+        
+        function updateStats() {
+            const stats = lumascript.get_cache_stats();
+            document.getElementById('cache-stats').textContent = 
+                JSON.stringify(stats, null, 2);
+        }
+        
+        function updateEnhancedStats() {
+            const stats = lumascript.get_enhanced_cache_stats();
+            document.getElementById('enhanced-stats-content').textContent = 
+                JSON.stringify(stats, null, 2);
+            
+            // Update visualization
+            updateCacheVisualization(stats);
+        }
+        
+        function updateCacheVisualization(stats) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            // Draw cache visualization
+            // ... visualization code ...
+        }
+        
+        window.runCode = function() {
+            const code = document.getElementById('editor').value;
+            try {
+                const result = lumascript.eval(code);
+                document.getElementById('output').textContent = result;
+                updateStats();
+                updateEnhancedStats();
+            } catch (e) {
+                document.getElementById('output').textContent = `Error: ${e}`;
+            }
+        };
+    </script>
+</body>
+</html> 

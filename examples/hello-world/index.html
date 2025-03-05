@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>LumaScript WASM Demo</title>
+</head>
+<body>
+    <h1>LumaScript WASM Demo</h1>
+    <div id="output"></div>
+    <script type="module">
+        import init, { hello_world, LumaRuntime } from './pkg/lumascript.js';
+
+        async function run() {
+            // Initialize WASM
+            await init();
+
+            // Basic hello world
+            const message = hello_world();
+            document.getElementById('output').textContent = message;
+
+            // Runtime example
+            const runtime = new LumaRuntime();
+            console.log(runtime.print("Testing WASM integration"));
+        }
+
+        run();
+    </script>
+</body>
+</html> 
