@@ -32,7 +32,7 @@ class Parameter(Node):
 @dataclass
 class Block(Node):
     """Block of statements"""
-    statements: List['Statement']
+    statements: List['Node']
 
 @dataclass
 class Statement(Node):
@@ -42,19 +42,19 @@ class Statement(Node):
 @dataclass
 class ReturnStatement(Statement):
     """Return statement"""
-    expression: 'Expression'
+    expression: 'Node'
 
 @dataclass
 class IfStatement(Statement):
     """If statement"""
-    condition: 'Expression'
+    condition: 'Node'
     then_block: Block
-    else_block: Optional[Block] = None
+    else_block: Optional[Block]
 
 @dataclass
 class WhileStatement(Statement):
     """While loop statement"""
-    condition: 'Expression'
+    condition: 'Node'
     body: Block
 
 @dataclass
@@ -62,14 +62,14 @@ class LetStatement(Statement):
     """Variable declaration statement"""
     name: str
     type: str
-    initializer: 'Expression'
+    initializer: 'Node'
 
 @dataclass
 class AssignStatement(Statement):
     """Variable assignment statement"""
     name: str
     operator: str  # '=', '+=', '-=', '*=', '/='
-    value: 'Expression'
+    value: 'Node'
 
 @dataclass
 class Expression(Node):
@@ -93,10 +93,65 @@ class NumberLiteral(Expression):
     """Numeric literal"""
     value: float
 
+@dataclass
+class AllocExpression(Node):
+    """Memory allocation expression"""
+    type: str
+    size: 'Node'
+
+@dataclass
+class FreeStatement(Node):
+    """Memory deallocation statement"""
+    pointer: 'Node'
+
+@dataclass
+class SizeofExpression(Node):
+    """Sizeof expression"""
+    type: str
+
+@dataclass
+class AddressOfExpression(Node):
+    """Address-of expression"""
+    expression: 'Node'
+
+@dataclass
+class DereferenceExpression(Node):
+    """Dereference expression"""
+    pointer: 'Node'
+
+@dataclass
+class PointerType(Node):
+    """Pointer type node"""
+    base_type: str
+
+@dataclass
+class StringLiteral(Expression):
+    """String literal node"""
+    value: str
+
+@dataclass
+class StringLength(Expression):
+    """String length operation"""
+    string: Expression
+
+@dataclass
+class StringConcat(Expression):
+    """String concatenation"""
+    left: Expression
+    right: Expression
+
+@dataclass
+class Substring(Expression):
+    """Substring operation"""
+    string: Expression
+    start: Expression
+    length: Expression
+
 class Parser:
     def __init__(self, tokens: List[Token]):
         self.tokens = tokens
         self.current = 0
+        self.types = {'i32', 'i64', 'f32', 'f64', 'ptr', 'string'}
 
     def parse(self) -> Program:
         """Parse the tokens into an AST"""
@@ -147,19 +202,22 @@ class Parser:
             statements.append(self.statement())
         return Block(statements)
 
-    def statement(self) -> Statement:
+    def statement(self) -> Node:
         """Parse a statement"""
         if self.match('RETURN'):
             return self.return_statement()
-        if self.match('IF'):
+        elif self.match('IF'):
             return self.if_statement()
-        if self.match('WHILE'):
+        elif self.match('WHILE'):
             return self.while_statement()
-        if self.match('LET'):
+        elif self.match('LET'):
             return self.let_statement()
-        if self.match('IDENTIFIER'):
+        elif self.match('FREE'):
+            return self.free_statement()
+        elif self.check('IDENTIFIER'):
             return self.assignment_statement()
-        raise SyntaxError(f"Unexpected token {self.peek().type}")
+        else:
+            return self.expression()
 
     def return_statement(self) -> ReturnStatement:
         """Parse a return statement"""
@@ -225,9 +283,18 @@ class Parser:
         
         return AssignStatement(name, operator, value)
 
-    def expression(self) -> Expression:
+    def expression(self) -> Node:
         """Parse an expression"""
-        return self.comparison()
+        if self.match('ALLOC'):
+            return self.alloc_expression()
+        elif self.match('SIZEOF'):
+            return self.sizeof_expression()
+        elif self.match('ADDRESS_OF'):
+            return self.address_of_expression()
+        elif self.match('DEREFERENCE'):
+            return self.dereference_expression()
+        else:
+            return self.comparison()
 
     def comparison(self) -> Expression:
         """Parse comparison expressions"""
@@ -267,10 +334,81 @@ class Parser:
         if self.match('INTEGER', 'FLOAT'):
             return NumberLiteral(float(self.previous().value))
             
+        if self.match('STRING'):
+            return StringLiteral(self.previous().value)
+            
         if self.match('IDENTIFIER'):
             return Identifier(self.previous().value)
             
+        if self.match('LEN'):
+            self.consume('LPAREN', "Expected '(' after 'len'")
+            expr = self.expression()
+            self.consume('RPAREN', "Expected ')' after expression")
+            return StringLength(expr)
+            
+        if self.match('CONCAT'):
+            self.consume('LPAREN', "Expected '(' after 'concat'")
+            left = self.expression()
+            self.consume('COMMA', "Expected ',' after first string")
+            right = self.expression()
+            self.consume('RPAREN', "Expected ')' after second string")
+            return StringConcat(left, right)
+            
+        if self.match('SUBSTR'):
+            self.consume('LPAREN', "Expected '(' after 'substr'")
+            string = self.expression()
+            self.consume('COMMA', "Expected ',' after string")
+            start = self.expression()
+            self.consume('COMMA', "Expected ',' after start index")
+            length = self.expression()
+            self.consume('RPAREN', "Expected ')' after length")
+            return Substring(string, start, length)
+            
         raise SyntaxError(f"Expect expression, got {self.peek().type}")
+
+    def alloc_expression(self) -> AllocExpression:
+        """Parse memory allocation"""
+        self.consume('LPAREN', "Expected '(' after 'alloc'")
+        type_token = self.consume('TYPE', "Expected type in alloc expression")
+        self.consume('COMMA', "Expected ',' after type")
+        size = self.expression()
+        self.consume('RPAREN', "Expected ')' after size")
+        return AllocExpression(type_token.value, size)
+
+    def free_statement(self) -> FreeStatement:
+        """Parse memory deallocation"""
+        self.consume('LPAREN', "Expected '(' after 'free'")
+        pointer = self.expression()
+        self.consume('RPAREN', "Expected ')' after pointer")
+        self.consume('SEMICOLON', "Expected ';' after free statement")
+        return FreeStatement(pointer)
+
+    def sizeof_expression(self) -> SizeofExpression:
+        """Parse sizeof expression"""
+        self.consume('LPAREN', "Expected '(' after 'sizeof'")
+        type_token = self.consume('TYPE', "Expected type in sizeof expression")
+        self.consume('RPAREN', "Expected ')' after type")
+        return SizeofExpression(type_token.value)
+
+    def address_of_expression(self) -> AddressOfExpression:
+        """Parse address-of expression"""
+        expression = self.expression()
+        return AddressOfExpression(expression)
+
+    def dereference_expression(self) -> DereferenceExpression:
+        """Parse dereference expression"""
+        pointer = self.expression()
+        return DereferenceExpression(pointer)
+
+    def type_specifier(self) -> str:
+        """Parse a type specifier"""
+        if self.match('PTR'):
+            self.consume('LESS', "Expected '<' after 'ptr'")
+            base_type = self.consume('TYPE', "Expected base type").value
+            self.consume('GREATER', "Expected '>' after base type")
+            return f"ptr<{base_type}>"
+        else:
+            return self.consume('TYPE', "Expected type").value
 
     # Helper methods
     def match(self, *types) -> bool:

@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional
 from ..utils.logger import Logger
+from .parser import Node  # Import Node as base AST type
 
 class LumaCompiler:
     def __init__(self):
@@ -53,35 +54,35 @@ class Lexer:
         pass
 
 class Parser:
-    def parse(self, tokens: List[Token]) -> AST:
+    def parse(self, tokens: List[Token]) -> Node:
         """Convert tokens to Abstract Syntax Tree"""
         pass
 
 class TypeChecker:
-    def analyze(self, ast: AST) -> None:
+    def analyze(self, ast: Node) -> None:
         """Verify types and semantics"""
         pass
 
 class WASMGenerator:
-    def generate(self, ast: AST) -> bytes:
+    def generate(self, ast: Node) -> bytes:
         """Generate WASM binary from AST"""
         pass
 
 class Optimizer:
-    def optimize(self, ast: AST) -> AST:
+    def optimize(self, ast: Node) -> Node:
         """Basic optimizations (constants, dead code)"""
         pass 
 
 class Optimizations:
-    def constant_folding(self, ast: AST) -> AST:
+    def constant_folding(self, ast: Node) -> Node:
         """Evaluate constant expressions at compile time"""
         pass
 
-    def dead_code_elimination(self, ast: AST) -> AST:
+    def dead_code_elimination(self, ast: Node) -> Node:
         """Remove unreachable code"""
         pass
 
-    def inline_small_functions(self, ast: AST) -> AST:
+    def inline_small_functions(self, ast: Node) -> Node:
         """Inline small function calls"""
         pass
 

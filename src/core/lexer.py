@@ -25,6 +25,16 @@ class Lexer:
         'i64': 'TYPE',
         'f32': 'TYPE',
         'f64': 'TYPE',
+        'alloc': 'ALLOC',      # Memory allocation
+        'free': 'FREE',        # Memory deallocation
+        'sizeof': 'SIZEOF',    # Size of type
+        'ptr': 'PTR',         # Pointer type
+        'ref': 'REF',         # Reference operator
+        'deref': 'DEREF',      # Dereference operator
+        'string': 'TYPE',      # String type
+        'len': 'LEN',         # String length
+        'concat': 'CONCAT',   # String concatenation
+        'substr': 'SUBSTR'    # Substring operation
     }
     
     OPERATORS = {
@@ -50,6 +60,9 @@ class Lexer:
         '-=': 'MINUS_ASSIGN',
         '*=': 'MULTIPLY_ASSIGN',
         '/=': 'DIVIDE_ASSIGN',
+        '&': 'ADDRESS_OF',     # Get address
+        '@': 'DEREFERENCE',    # Dereference pointer
+        '.': 'DOT'            # Member access
     }
 
     def __init__(self):
@@ -149,6 +162,43 @@ class Lexer:
             return None
         return self.source[peek_pos]
 
+    def string_literal(self) -> Token:
+        """Parse a string literal"""
+        result = ''
+        start_column = self.column
+        
+        # Skip opening quote
+        self.advance()
+        
+        while self.current_char and self.current_char != '"':
+            if self.current_char == '\\':
+                self.advance()
+                if self.current_char == 'n':
+                    result += '\n'
+                elif self.current_char == 't':
+                    result += '\t'
+                elif self.current_char == '"':
+                    result += '"'
+                elif self.current_char == '\\':
+                    result += '\\'
+                else:
+                    raise SyntaxError(
+                        f"Invalid escape sequence '\\{self.current_char}' at line {self.line}, column {self.column}"
+                    )
+            else:
+                result += self.current_char
+            self.advance()
+            
+        if not self.current_char:
+            raise SyntaxError(
+                f"Unterminated string at line {self.line}, column {start_column}"
+            )
+            
+        # Skip closing quote
+        self.advance()
+        
+        return Token('STRING', result, self.line, start_column)
+
     def tokenize(self, source: str) -> List[Token]:
         """Convert source code to list of tokens"""
         self.init(source)
@@ -165,6 +215,10 @@ class Lexer:
 
             if self.current_char.isalpha() or self.current_char == '_':
                 tokens.append(self.identifier())
+                continue
+
+            if self.current_char == '"':
+                tokens.append(self.string_literal())
                 continue
 
             op_token = self.operator()

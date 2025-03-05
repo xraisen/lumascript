@@ -5,8 +5,9 @@ from dataclasses import dataclass
 from typing import List, Dict, Tuple, Optional
 from .parser import (
     Program, Function, Parameter, Block, ReturnStatement, IfStatement,
-    WhileStatement, LetStatement, AssignStatement,
-    BinaryOp, Identifier, NumberLiteral, Node
+    WhileStatement, LetStatement, AssignStatement, BinaryOp, Identifier,
+    NumberLiteral, AllocExpression, FreeStatement, SizeofExpression,
+    AddressOfExpression, DereferenceExpression, PointerType, Node
 )
 
 @dataclass
@@ -50,11 +51,30 @@ class WASMGenerator:
     BR_IF = 0x0D
     END = 0x0B
 
+    # Memory instructions
+    MEMORY_SIZE = 0x3F
+    MEMORY_GROW = 0x40
+    I32_LOAD = 0x28
+    I32_STORE = 0x36
+    I64_LOAD = 0x29
+    I64_STORE = 0x37
+    F32_LOAD = 0x2A
+    F32_STORE = 0x38
+    F64_LOAD = 0x2B
+    F64_STORE = 0x39
+
     def __init__(self):
         self.functions: List[Function] = []
         self.function_types: Dict[str, int] = {}  # Maps function signature to type index
         self.local_vars: Dict[str, int] = {}      # Maps variable names to local indices
         self.next_local_index: int = 0            # Next available local index
+        self.heap_start: int = 0                  # Start of heap memory
+        self.type_sizes = {
+            'i32': 4,
+            'i64': 8,
+            'f32': 4,
+            'f64': 8
+        }
 
     def generate(self, ast: Program) -> bytes:
         """Generate WASM binary from AST"""
@@ -63,6 +83,7 @@ class WASMGenerator:
         # Generate sections
         type_section = self.generate_type_section()
         function_section = self.generate_function_section()
+        memory_section = self.generate_memory_section()
         export_section = self.generate_export_section()
         code_section = self.generate_code_section()
         
@@ -74,6 +95,7 @@ class WASMGenerator:
             # Sections
             self.encode_section(self.TYPE_SECTION, type_section) +
             self.encode_section(self.FUNCTION_SECTION, function_section) +
+            self.encode_section(self.MEMORY_SECTION, memory_section) +
             self.encode_section(self.EXPORT_SECTION, export_section) +
             self.encode_section(self.CODE_SECTION, code_section)
         )
@@ -116,6 +138,12 @@ class WASMGenerator:
             indices.append(type_idx)
         
         return self.encode_vector([bytes([idx]) for idx in indices])
+
+    def generate_memory_section(self) -> bytes:
+        """Generate memory section"""
+        # Initial memory size: 1 page (64KB)
+        # Maximum memory size: 256 pages (16MB)
+        return self.encode_vector([bytes([0x01, 0x00, 0x01])])
 
     def generate_export_section(self) -> bytes:
         """Generate export section for function exports"""
@@ -180,20 +208,18 @@ class WASMGenerator:
         """Generate code for a statement"""
         if isinstance(stmt, ReturnStatement):
             return self.generate_expression(stmt.expression)
-            
-        if isinstance(stmt, IfStatement):
+        elif isinstance(stmt, IfStatement):
             return self.generate_if_statement(stmt)
-            
-        if isinstance(stmt, WhileStatement):
+        elif isinstance(stmt, WhileStatement):
             return self.generate_while_statement(stmt)
-            
-        if isinstance(stmt, LetStatement):
+        elif isinstance(stmt, LetStatement):
             return self.generate_let_statement(stmt)
-            
-        if isinstance(stmt, AssignStatement):
+        elif isinstance(stmt, AssignStatement):
             return self.generate_assignment(stmt)
-            
-        raise ValueError(f"Unsupported statement type: {type(stmt)}")
+        elif isinstance(stmt, FreeStatement):
+            return self.generate_free_statement(stmt)
+        else:
+            return self.generate_expression(stmt)
 
     def generate_if_statement(self, stmt: IfStatement) -> bytes:
         """Generate code for an if statement"""
@@ -296,27 +322,157 @@ class WASMGenerator:
     def generate_expression(self, expr: Node) -> bytes:
         """Generate code for an expression"""
         if isinstance(expr, NumberLiteral):
-            return (
-                bytes([self.I32_CONST]) +
-                self.encode_signed_leb128(int(expr.value))
-            )
-            
-        if isinstance(expr, Identifier):
-            if expr.name not in self.local_vars:
-                raise ValueError(f"Undefined variable: {expr.name}")
-            return bytes([
-                self.LOCAL_GET,
-                self.local_vars[expr.name]
-            ])
-            
-        if isinstance(expr, BinaryOp):
-            code = bytearray()
-            code.extend(self.generate_expression(expr.left))
-            code.extend(self.generate_expression(expr.right))
-            code.append(self.get_binary_op(expr.operator))
-            return bytes(code)
-            
-        raise ValueError(f"Unsupported expression type: {type(expr)}")
+            return bytes([self.I32_CONST]) + self.encode_signed_leb128(expr.value)
+        elif isinstance(expr, Identifier):
+            return bytes([self.LOCAL_GET, self.local_vars[expr.name]])
+        elif isinstance(expr, BinaryOp):
+            return self.generate_binary_op(expr)
+        elif isinstance(expr, AllocExpression):
+            return self.generate_alloc_expression(expr)
+        elif isinstance(expr, SizeofExpression):
+            return self.generate_sizeof_expression(expr)
+        elif isinstance(expr, AddressOfExpression):
+            return self.generate_address_of_expression(expr)
+        elif isinstance(expr, DereferenceExpression):
+            return self.generate_dereference_expression(expr)
+        else:
+            raise ValueError(f"Unsupported expression type: {type(expr)}")
+
+    def generate_alloc_expression(self, expr: AllocExpression) -> bytes:
+        """Generate code for memory allocation with safety checks"""
+        code = bytearray()
+        
+        # Get current memory size
+        code.append(self.MEMORY_SIZE)
+        code.append(0x00)  # Reserved memory index
+        
+        # Calculate allocation size
+        code.extend(self.generate_expression(expr.size))
+        
+        # Check for zero or negative size
+        code.append(self.I32_CONST)
+        code.extend(self.encode_signed_leb128(0))
+        code.append(self.I32_GT)  # size > 0
+        
+        # If size <= 0, return 0 (null pointer)
+        code.append(self.IF)
+        code.append(self.I32_TYPE)
+        
+        # Multiply by type size
+        type_size = self.type_sizes.get(expr.type, 4)  # Default to 4 bytes
+        code.append(self.I32_CONST)
+        code.extend(self.encode_signed_leb128(type_size))
+        code.append(self.I32_MUL)
+        
+        # Add alignment padding
+        code.append(self.I32_CONST)
+        code.extend(self.encode_signed_leb128(type_size - 1))
+        code.append(self.I32_ADD)
+        code.append(self.I32_CONST)
+        code.extend(self.encode_signed_leb128(type_size))
+        code.append(self.I32_DIV)
+        code.append(self.I32_CONST)
+        code.extend(self.encode_signed_leb128(type_size))
+        code.append(self.I32_MUL)
+        
+        # Grow memory
+        code.append(self.MEMORY_GROW)
+        code.append(0x00)  # Reserved memory index
+        
+        # Check for allocation failure
+        code.append(self.I32_CONST)
+        code.extend(self.encode_signed_leb128(-1))
+        code.append(self.I32_NE)
+        
+        # If allocation failed, return 0 (null pointer)
+        code.append(self.IF)
+        code.append(self.I32_TYPE)
+        
+        # Calculate pointer to allocated memory
+        code.append(self.MEMORY_SIZE)
+        code.append(0x00)
+        code.append(self.I32_CONST)
+        code.extend(self.encode_signed_leb128(1))
+        code.append(self.I32_SUB)
+        code.append(self.I32_CONST)
+        code.extend(self.encode_signed_leb128(65536))  # Page size
+        code.append(self.I32_MUL)
+        
+        code.append(self.ELSE)
+        code.append(self.I32_CONST)
+        code.extend(self.encode_signed_leb128(0))  # Return null pointer
+        code.append(self.END)
+        
+        code.append(self.ELSE)
+        code.append(self.I32_CONST)
+        code.extend(self.encode_signed_leb128(0))  # Return null pointer
+        code.append(self.END)
+        
+        return bytes(code)
+
+    def generate_free_statement(self, stmt: FreeStatement) -> bytes:
+        """Generate code for memory deallocation"""
+        # For now, just evaluate the pointer expression
+        # Memory management will be handled by a future garbage collector
+        return self.generate_expression(stmt.pointer)
+
+    def generate_sizeof_expression(self, expr: SizeofExpression) -> bytes:
+        """Generate code for sizeof expression"""
+        type_size = self.type_sizes.get(expr.type, 4)  # Default to 4 bytes
+        return bytes([self.I32_CONST]) + self.encode_signed_leb128(type_size)
+
+    def generate_address_of_expression(self, expr: AddressOfExpression) -> bytes:
+        """Generate code for address-of expression"""
+        if isinstance(expr.expression, Identifier):
+            # For now, just return the local index as the "address"
+            return bytes([self.I32_CONST]) + self.encode_signed_leb128(self.local_vars[expr.expression.name])
+        raise ValueError("Can only take address of identifiers")
+
+    def generate_dereference_expression(self, expr: DereferenceExpression) -> bytes:
+        """Generate code for dereference expression with bounds checking"""
+        code = bytearray()
+        
+        # Generate code to get the pointer value
+        code.extend(self.generate_expression(expr.pointer))
+        
+        # Check for null pointer
+        code.append(self.I32_CONST)
+        code.extend(self.encode_signed_leb128(0))
+        code.append(self.I32_NE)
+        
+        # If pointer is not null, load value
+        code.append(self.IF)
+        code.append(self.I32_TYPE)
+        
+        # Check if pointer is within memory bounds
+        code.append(self.DUP)  # Duplicate pointer for bounds check
+        code.append(self.MEMORY_SIZE)
+        code.append(0x00)
+        code.append(self.I32_CONST)
+        code.extend(self.encode_signed_leb128(65536))  # Page size
+        code.append(self.I32_MUL)
+        code.append(self.I32_LT)
+        
+        # If within bounds, load value
+        code.append(self.IF)
+        code.append(self.I32_TYPE)
+        
+        # Load from memory with alignment check
+        code.append(self.I32_LOAD)
+        code.extend(self.encode_unsigned_leb128(2))  # align
+        code.extend(self.encode_unsigned_leb128(0))  # offset
+        
+        code.append(self.ELSE)
+        code.append(self.I32_CONST)
+        code.extend(self.encode_signed_leb128(0))  # Return 0 for out of bounds
+        code.append(self.END)
+        
+        code.append(self.ELSE)
+        code.append(self.I32_CONST)
+        code.extend(self.encode_signed_leb128(0))  # Return 0 for null pointer
+        code.append(self.END)
+        
+        return bytes(code)
 
     # Helper methods
     def get_wasm_type(self, type_str: str) -> int:
